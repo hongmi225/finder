@@ -1,0 +1,570 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>법률 사례 검토 도구</title>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<style>
+  @font-face {
+    font-family: 'Pretendard';
+    src: url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/woff2/PretendardVariable.woff2') format('woff2-variations');
+    font-weight: 45 920;
+  }
+
+  :root{
+    --navy:#1A2942;
+    --navy-deep:#101A2C;
+    --charcoal:#2D2D2D;
+    --offwhite:#F7F6F3;
+    --gold:#B8924A;
+    --gold-soft:#D8C49A;
+    --line:#E5E3DD;
+    --line-strong:#CFCBC0;
+    --danger:#8C3A2E;
+    --ok:#3E5C3A;
+    --font-serif:'Noto Serif KR', serif;
+    --font-sans:'Pretendard', -apple-system, BlinkMacSystemFont, sans-serif;
+  }
+
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--offwhite);
+    color:var(--charcoal);
+    font-family:var(--font-sans);
+    line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  /* ---------- Header ---------- */
+  .masthead{
+    background:var(--navy);
+    color:var(--offwhite);
+    padding:28px 40px 26px;
+    border-bottom:3px solid var(--gold);
+    position:relative;
+  }
+  .masthead::after{
+    content:"";
+    position:absolute; left:0; right:0; bottom:-7px; height:1px;
+    background:var(--line-strong);
+  }
+  .masthead-inner{
+    max-width:1280px; margin:0 auto;
+    display:flex; align-items:baseline; justify-content:space-between; gap:24px;
+    flex-wrap:wrap;
+  }
+  .brand{
+    display:flex; align-items:center; gap:14px;
+  }
+  .brand-mark{
+    width:38px; height:38px; border:1.5px solid var(--gold);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-serif); font-size:18px; color:var(--gold);
+    flex-shrink:0;
+    transform:rotate(45deg);
+  }
+  .brand-mark span{ transform:rotate(-45deg); }
+  .brand-text h1{
+    font-family:var(--font-serif);
+    font-size:21px; font-weight:600; margin:0; letter-spacing:0.01em;
+  }
+  .brand-text .sub{
+    font-size:12px; color:var(--gold-soft); letter-spacing:0.12em; margin-top:2px;
+  }
+  .masthead-meta{
+    font-size:12px; color:rgba(247,246,243,0.6); text-align:right;
+    letter-spacing:0.02em;
+  }
+
+  /* ---------- Layout ---------- */
+  .stage{
+    max-width:1280px; margin:0 auto;
+    padding:36px 40px 80px;
+    display:grid;
+    grid-template-columns:400px 1fr;
+    gap:32px;
+    align-items:start;
+  }
+
+  @media (max-width: 900px){
+    .stage{ grid-template-columns:1fr; padding:24px 18px 56px; }
+    .masthead{ padding:22px 20px; }
+  }
+
+  /* ---------- Input panel ---------- */
+  .panel{
+    background:#fff;
+    border:1px solid var(--line);
+    position:sticky;
+    top:24px;
+  }
+  .panel-head{
+    padding:18px 22px 16px;
+    border-bottom:1px solid var(--line);
+    display:flex; align-items:center; justify-content:space-between;
+  }
+  .panel-head .eyebrow{
+    font-size:11px; letter-spacing:0.14em; color:var(--gold);
+    font-weight:600; text-transform:uppercase;
+  }
+  .panel-head .num{
+    font-size:11px; color:#9b968a;
+  }
+  .panel-body{ padding:22px; }
+
+  label.field-label{
+    display:block; font-size:12.5px; font-weight:600;
+    color:var(--navy); margin-bottom:8px; letter-spacing:0.01em;
+  }
+  textarea#caseInput{
+    width:100%; min-height:220px; resize:vertical;
+    border:1px solid var(--line-strong);
+    background:var(--offwhite);
+    padding:14px; font-family:var(--font-sans); font-size:14.5px;
+    color:var(--charcoal); line-height:1.65;
+  }
+  textarea#caseInput:focus{
+    outline:none; border-color:var(--navy); background:#fff;
+  }
+  textarea#caseInput::placeholder{ color:#a8a399; }
+
+  .field-hint{
+    font-size:12px; color:#8d8a80; margin-top:8px; line-height:1.5;
+  }
+
+  .options-row{
+    margin-top:18px; display:flex; gap:10px; flex-wrap:wrap;
+  }
+  .chip{
+    border:1px solid var(--line-strong);
+    background:#fff;
+    font-size:12.5px; padding:7px 13px;
+    color:var(--charcoal); cursor:pointer;
+    user-select:none; transition:all .15s ease;
+  }
+  .chip.active{
+    background:var(--navy); color:#fff; border-color:var(--navy);
+  }
+
+  .submit-btn{
+    margin-top:20px; width:100%;
+    background:var(--navy); color:#fff;
+    border:none; padding:14px 18px;
+    font-size:14.5px; font-weight:600; letter-spacing:0.02em;
+    cursor:pointer; font-family:var(--font-sans);
+    display:flex; align-items:center; justify-content:center; gap:10px;
+    transition:background .15s ease;
+  }
+  .submit-btn:hover:not(:disabled){ background:var(--navy-deep); }
+  .submit-btn:disabled{ background:#a8a399; cursor:not-allowed; }
+
+  .spinner{
+    width:14px; height:14px; border-radius:50%;
+    border:2px solid rgba(255,255,255,0.35);
+    border-top-color:#fff;
+    animation:spin .7s linear infinite;
+    display:none;
+  }
+  .spinner.show{ display:inline-block; }
+  @keyframes spin{ to{ transform:rotate(360deg); } }
+
+  .disclaimer-box{
+    margin-top:20px; padding:13px 14px;
+    background:#FBF8F1; border-left:3px solid var(--gold);
+    font-size:11.5px; color:#6b5f44; line-height:1.6;
+  }
+
+  /* ---------- Results ---------- */
+  .results{ min-height:400px; }
+
+  .empty-state{
+    border:1px dashed var(--line-strong);
+    background:#fff;
+    padding:80px 40px;
+    text-align:center;
+    color:#a8a399;
+  }
+  .empty-state .glyph{
+    font-family:var(--font-serif); font-size:38px; color:var(--gold-soft);
+    margin-bottom:14px;
+  }
+  .empty-state p{ font-size:13.5px; margin:0; }
+
+  .result-section{
+    background:#fff; border:1px solid var(--line);
+    margin-bottom:22px;
+  }
+  .result-section-head{
+    padding:16px 22px;
+    border-bottom:1px solid var(--line);
+    display:flex; align-items:center; gap:12px;
+  }
+  .seal{
+    width:30px; height:30px; flex-shrink:0;
+    border:1.5px solid var(--navy);
+    display:flex; align-items:center; justify-content:center;
+    font-family:var(--font-serif); font-size:12px; font-weight:700;
+    color:var(--navy);
+  }
+  .seal.gold{ border-color:var(--gold); color:var(--gold); }
+  .result-section-head h2{
+    font-family:var(--font-serif); font-size:16px; margin:0;
+    color:var(--navy); font-weight:600;
+  }
+  .result-section-head .count{
+    margin-left:auto; font-size:12px; color:#9b968a;
+  }
+  .result-section-body{ padding:6px 0; }
+
+  /* statute card */
+  .statute-item{
+    padding:16px 22px; border-bottom:1px solid var(--line);
+  }
+  .statute-item:last-child{ border-bottom:none; }
+  .statute-title{
+    font-size:14px; font-weight:700; color:var(--navy); margin-bottom:6px;
+  }
+  .statute-text{
+    font-size:13.5px; color:var(--charcoal); line-height:1.7;
+    background:var(--offwhite); padding:10px 12px; border-left:2px solid var(--line-strong);
+    margin-bottom:8px;
+  }
+  .statute-relevance{
+    font-size:13px; color:#5a5650; line-height:1.65;
+  }
+  .statute-relevance .label{
+    font-size:11px; color:var(--gold); font-weight:700; letter-spacing:0.06em;
+    margin-right:6px;
+  }
+
+  /* opinion */
+  .opinion-body{
+    padding:18px 22px;
+    font-size:14px; line-height:1.85; color:var(--charcoal);
+    white-space:pre-wrap;
+  }
+
+  /* precedent card */
+  .precedent-item{
+    padding:16px 22px; border-bottom:1px solid var(--line);
+  }
+  .precedent-item:last-child{ border-bottom:none; }
+  .precedent-top{
+    display:flex; align-items:baseline; justify-content:space-between; gap:12px;
+    margin-bottom:6px; flex-wrap:wrap;
+  }
+  .precedent-name{
+    font-size:14px; font-weight:700; color:var(--navy);
+  }
+  .precedent-case-no{
+    font-size:12px; color:#9b968a; font-family:monospace;
+  }
+  .precedent-summary{
+    font-size:13.5px; color:var(--charcoal); line-height:1.7; margin-bottom:8px;
+  }
+  .precedent-link{
+    font-size:12px; color:var(--gold);
+    text-decoration:none; border-bottom:1px solid var(--gold-soft);
+  }
+  .precedent-link:hover{ color:var(--navy); border-color:var(--navy); }
+
+  .verification-note{
+    margin-top:4px; padding:14px 18px;
+    background:#FBF3F1; border-left:3px solid var(--danger);
+    font-size:12.5px; color:#6b3a30; line-height:1.65;
+  }
+  .verification-note strong{ color:var(--danger); }
+
+  .error-box{
+    background:#fff; border:1px solid var(--danger);
+    padding:20px 22px; color:var(--danger); font-size:13.5px;
+  }
+
+  .grounding-sources{
+    padding:14px 22px; border-top:1px solid var(--line);
+    background:var(--offwhite);
+  }
+  .grounding-sources .gs-label{
+    font-size:11px; color:var(--gold); font-weight:700; letter-spacing:0.06em;
+    margin-bottom:8px;
+  }
+  .gs-link{
+    display:block; font-size:12px; color:#5a5650; margin-bottom:4px;
+    text-decoration:none;
+  }
+  .gs-link:hover{ color:var(--navy); }
+</style>
+</head>
+<body>
+
+<header class="masthead">
+  <div class="masthead-inner">
+    <div class="brand">
+      <div class="brand-mark"><span>法</span></div>
+      <div class="brand-text">
+        <h1>법률 사례 검토 도구</h1>
+        <div class="sub">LEGAL CASE REVIEW ASSISTANT</div>
+      </div>
+    </div>
+    <div class="masthead-meta">사내 법무 검토 보조용 · AI 기반 1차 스크리닝</div>
+  </div>
+</header>
+
+<div class="stage">
+
+  <!-- Input Panel -->
+  <div class="panel">
+    <div class="panel-head">
+      <span class="eyebrow">사건 개요 입력</span>
+      <span class="num">01</span>
+    </div>
+    <div class="panel-body">
+      <label class="field-label" for="caseInput">검토할 사례 / 상황을 입력하세요</label>
+      <textarea id="caseInput" placeholder="예) 협력업체와 체결한 용역계약에서, 상대방이 계약기간 중 사전 통지 없이 일방적으로 계약을 해지하고 기납부 대금의 반환을 거부하고 있습니다. 계약서에는 해지 관련 별도 조항이 없습니다."></textarea>
+      <div class="field-hint">사실관계를 구체적으로 적을수록 결과의 정확도가 높아집니다. (당사자 관계, 시점, 계약 유무, 분쟁의 핵심 쟁점 등)</div>
+
+      <div class="options-row" id="domainChips">
+        <div class="chip active" data-domain="자동판단">분야 자동판단</div>
+        <div class="chip" data-domain="민사·계약">민사·계약</div>
+        <div class="chip" data-domain="노동">노동</div>
+        <div class="chip" data-domain="상사·회사">상사·회사</div>
+        <div class="chip" data-domain="형사">형사</div>
+        <div class="chip" data-domain="행정·규제">행정·규제</div>
+      </div>
+
+      <button class="submit-btn" id="submitBtn">
+        <span id="btnLabel">관련 법령 · 판례 검토</span>
+        <span class="spinner" id="spinner"></span>
+      </button>
+
+      <div class="disclaimer-box">
+        본 도구는 AI를 활용한 1차 스크리닝 보조 자료입니다. 제시되는 법령 조문 및 판례는 반드시 원문(국가법령정보센터, 종합법률정보 등)을 통해 직접 검증한 후 업무에 활용하시기 바랍니다.
+      </div>
+    </div>
+  </div>
+
+  <!-- Results -->
+  <div class="results" id="results">
+    <div class="empty-state">
+      <div class="glyph">§</div>
+      <p>좌측에 사례를 입력하고 검토를 시작하세요.<br>관련 법령, 해석, 유사 판례가 함께 제시됩니다.</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+let selectedDomain = "자동판단";
+
+document.querySelectorAll('#domainChips .chip').forEach(chip => {
+  chip.addEventListener('click', () => {
+    document.querySelectorAll('#domainChips .chip').forEach(c => c.classList.remove('active'));
+    chip.classList.add('active');
+    selectedDomain = chip.dataset.domain;
+  });
+});
+
+const submitBtn = document.getElementById('submitBtn');
+const btnLabel = document.getElementById('btnLabel');
+const spinner = document.getElementById('spinner');
+const resultsEl = document.getElementById('results');
+
+submitBtn.addEventListener('click', async () => {
+  const caseText = document.getElementById('caseInput').value.trim();
+  if (!caseText) {
+    document.getElementById('caseInput').focus();
+    return;
+  }
+
+  setLoading(true);
+  resultsEl.innerHTML = `
+    <div class="empty-state">
+      <div class="glyph">⋯</div>
+      <p>법령 및 판례를 검토하고 있습니다. 잠시만 기다려 주세요.</p>
+    </div>`;
+
+  try {
+    const data = await analyzeCase(caseText, selectedDomain);
+    renderResults(data);
+  } catch (err) {
+    console.error(err);
+    resultsEl.innerHTML = `
+      <div class="error-box">
+        검토 중 오류가 발생했습니다. 입력 내용을 줄여서 다시 시도하거나, 잠시 후 다시 시도해 주세요.<br>
+        <span style="font-size:11.5px; opacity:0.8;">${escapeHtml(String(err.message || err))}</span>
+      </div>`;
+  } finally {
+    setLoading(false);
+  }
+});
+
+function setLoading(isLoading){
+  submitBtn.disabled = isLoading;
+  spinner.classList.toggle('show', isLoading);
+  btnLabel.textContent = isLoading ? "검토 중입니다…" : "관련 법령 · 판례 검토";
+}
+
+async function analyzeCase(caseText, domain){
+  const domainHint = domain === "자동판단"
+    ? "사실관계에 따라 가장 적합한 법 분야를 스스로 판단하십시오."
+    : `이 사안은 주로 '${domain}' 분야와 관련이 있을 가능성이 높습니다. 단, 실제로 다른 분야가 더 적합하면 그에 따르십시오.`;
+
+  const systemPrompt = `당신은 기업 사내변호사의 1차 법률 검토를 보조하는 리서치 어시스턴트입니다.
+사용자가 입력한 사실관계를 분석하여 다음 세 가지를 JSON으로만 반환하십시오. 다른 텍스트, 설명, 마크다운 코드블록 기호(\`\`\`)는 절대 포함하지 마십시오.
+
+${domainHint}
+
+웹 검색 결과를 활용하여 실제 존재하는 대한민국 법령과 판례를 인용하십시오. 확실하지 않은 판례번호나 조문을 지어내지 마십시오. 검색으로 확인되지 않으면 해당 항목을 비워두거나 '검증 필요'로 표시하십시오.
+
+반환할 JSON 스키마:
+{
+  "domain_identified": "판단된 법 분야 (예: 민사-계약)",
+  "statutes": [
+    { "title": "법령명 및 조문 (예: 민법 제390조)", "text": "조문 내용 요약 또는 원문", "relevance": "이 조문이 본 사안과 관련된 이유" }
+  ],
+  "opinion": "사안에 대한 종합적인 법적 분석 및 해석 (3~6문장, 실무적 톤)",
+  "precedents": [
+    { "case_name": "판례 명칭 또는 사건명", "case_number": "사건번호 (확인되지 않으면 '검증 필요')", "summary": "판시사항 요약", "source_url": "출처 URL (있는 경우)" }
+  ],
+  "verification_required": true
+}
+
+statutes와 precedents는 각각 2~4개 정도로 핵심적인 것만 제시하십시오.`;
+
+  const response = await fetch("https://api.anthropic.com/v1/messages", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      model: "claude-sonnet-4-6",
+      max_tokens: 1000,
+      system: systemPrompt,
+      messages: [
+        { role: "user", content: `다음 사례를 검토해 주십시오:\n\n${caseText}` }
+      ],
+      tools: [
+        { type: "web_search_20250305", name: "web_search" }
+      ]
+    })
+  });
+
+  if (!response.ok) {
+    throw new Error(`API 요청 실패 (status ${response.status})`);
+  }
+
+  const data = await response.json();
+
+  const textBlocks = (data.content || [])
+    .filter(item => item.type === "text")
+    .map(item => item.text)
+    .join("\n");
+
+  return parseJsonLoose(textBlocks);
+}
+
+function parseJsonLoose(text){
+  let cleaned = text.trim();
+  cleaned = cleaned.replace(/^```json\s*/i, "").replace(/^```\s*/, "").replace(/```\s*$/, "");
+
+  const firstBrace = cleaned.indexOf('{');
+  const lastBrace = cleaned.lastIndexOf('}');
+  if (firstBrace === -1 || lastBrace === -1) {
+    throw new Error("결과를 해석할 수 없습니다. 모델이 예상된 형식으로 응답하지 않았습니다.");
+  }
+  cleaned = cleaned.slice(firstBrace, lastBrace + 1);
+
+  try {
+    return JSON.parse(cleaned);
+  } catch (e) {
+    throw new Error("JSON 파싱 오류: 응답 형식이 올바르지 않습니다.");
+  }
+}
+
+function escapeHtml(str){
+  const div = document.createElement('div');
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function renderResults(data){
+  const statutes = Array.isArray(data.statutes) ? data.statutes : [];
+  const precedents = Array.isArray(data.precedents) ? data.precedents : [];
+  const opinion = data.opinion || "";
+  const domainIdentified = data.domain_identified || "";
+
+  let html = "";
+
+  if (domainIdentified) {
+    html += `
+      <div style="margin-bottom:14px; font-size:12.5px; color:#8d8a80;">
+        판단된 분야 · <strong style="color:var(--navy);">${escapeHtml(domainIdentified)}</strong>
+      </div>`;
+  }
+
+  // 1. Statutes
+  html += `
+    <div class="result-section">
+      <div class="result-section-head">
+        <div class="seal">條</div>
+        <h2>관련 법령</h2>
+        <span class="count">${statutes.length}건</span>
+      </div>
+      <div class="result-section-body">
+        ${statutes.length === 0 ? emptyRow("관련 법령을 찾지 못했습니다.") :
+          statutes.map(s => `
+            <div class="statute-item">
+              <div class="statute-title">${escapeHtml(s.title || "")}</div>
+              ${s.text ? `<div class="statute-text">${escapeHtml(s.text)}</div>` : ""}
+              ${s.relevance ? `<div class="statute-relevance"><span class="label">관련성</span>${escapeHtml(s.relevance)}</div>` : ""}
+            </div>
+          `).join("")}
+      </div>
+    </div>`;
+
+  // 2. Opinion
+  html += `
+    <div class="result-section">
+      <div class="result-section-head">
+        <div class="seal gold">解</div>
+        <h2>종합 검토 의견</h2>
+      </div>
+      <div class="opinion-body">${escapeHtml(opinion)}</div>
+    </div>`;
+
+  // 3. Precedents
+  html += `
+    <div class="result-section">
+      <div class="result-section-head">
+        <div class="seal">判</div>
+        <h2>유사 판례</h2>
+        <span class="count">${precedents.length}건</span>
+      </div>
+      <div class="result-section-body">
+        ${precedents.length === 0 ? emptyRow("유사 판례를 찾지 못했습니다.") :
+          precedents.map(p => `
+            <div class="precedent-item">
+              <div class="precedent-top">
+                <span class="precedent-name">${escapeHtml(p.case_name || "")}</span>
+                <span class="precedent-case-no">${escapeHtml(p.case_number || "")}</span>
+              </div>
+              ${p.summary ? `<div class="precedent-summary">${escapeHtml(p.summary)}</div>` : ""}
+              ${p.source_url ? `<a class="precedent-link" href="${escapeHtml(p.source_url)}" target="_blank" rel="noopener">출처 확인 →</a>` : ""}
+            </div>
+          `).join("")}
+      </div>
+      <div class="verification-note">
+        <strong>검증 필요.</strong> 위 판례 정보는 AI 검색 결과를 기반으로 생성되었습니다. 실제 업무 활용 전 종합법률정보(glaw.scourt.go.kr) 또는 법원도서관을 통해 사건번호와 판시내용을 반드시 직접 확인하십시오.
+      </div>
+    </div>`;
+
+  resultsEl.innerHTML = html;
+}
+
+function emptyRow(msg){
+  return `<div class="statute-item" style="color:#a8a399; font-size:13px;">${escapeHtml(msg)}</div>`;
+}
+</script>
+
+</body>
+</html>
