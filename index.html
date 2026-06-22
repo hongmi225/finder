@@ -378,6 +378,14 @@ submitBtn.addEventListener('click', async () => {
     return;
   }
 
+  if (!GEMINI_API_KEY || GEMINI_API_KEY.includes("AQ.Ab8RN6Kl0gnDFi7TSicuPR1z7agXTwNeeizAzcwNZ2eAojCr2Q")) {
+    resultsEl.innerHTML = `
+      <div class="error-box">
+        Gemini API 키가 설정되지 않았습니다. index.html 파일 상단의 <code>GEMINI_API_KEY</code> 값을 본인의 키로 교체한 후 다시 업로드해 주세요.
+      </div>`;
+    return;
+  }
+
   setLoading(true);
   resultsEl.innerHTML = `
     <div class="empty-state">
@@ -406,17 +414,22 @@ function setLoading(isLoading){
   btnLabel.textContent = isLoading ? "검토 중입니다…" : "관련 법령 · 판례 검토";
 }
 
+// ⚠️ 사내 전용 도구입니다. 이 키가 노출되면 누구나 사용량을 소모할 수 있으니
+// 이 저장소는 반드시 Private으로 유지하거나 사내 인원만 접근 가능하도록 관리하세요.
+const GEMINI_API_KEY = "여기에_본인의_Gemini_API_키를_붙여넣으세요";
+const GEMINI_MODEL = "gemini-2.5-flash";
+
 async function analyzeCase(caseText, domain){
   const domainHint = domain === "자동판단"
     ? "사실관계에 따라 가장 적합한 법 분야를 스스로 판단하십시오."
     : `이 사안은 주로 '${domain}' 분야와 관련이 있을 가능성이 높습니다. 단, 실제로 다른 분야가 더 적합하면 그에 따르십시오.`;
 
-  const systemPrompt = `당신은 기업 사내변호사의 1차 법률 검토를 보조하는 리서치 어시스턴트입니다.
-사용자가 입력한 사실관계를 분석하여 다음 세 가지를 JSON으로만 반환하십시오. 다른 텍스트, 설명, 마크다운 코드블록 기호(\`\`\`)는 절대 포함하지 마십시오.
+  const prompt = `당신은 기업 사내변호사의 1차 법률 검토를 보조하는 리서치 어시스턴트입니다.
+사용자가 입력한 사실관계를 분석하여 아래 JSON 스키마에 맞는 결과만 반환하십시오. JSON 앞뒤에 다른 텍스트, 설명, 마크다운 코드블록 기호(\`\`\`)를 절대 포함하지 마십시오. 응답은 반드시 순수 JSON 객체 하나로만 구성하십시오.
 
 ${domainHint}
 
-웹 검색 결과를 활용하여 실제 존재하는 대한민국 법령과 판례를 인용하십시오. 확실하지 않은 판례번호나 조문을 지어내지 마십시오. 검색으로 확인되지 않으면 해당 항목을 비워두거나 '검증 필요'로 표시하십시오.
+검색 결과를 활용하여 실제 존재하는 대한민국 법령과 판례를 인용하십시오. 확실하지 않은 판례번호나 조문을 지어내지 마십시오. 검색으로 확인되지 않으면 해당 항목을 비워두거나 case_number를 '검증 필요'로 표시하십시오.
 
 반환할 JSON 스키마:
 {
@@ -431,36 +444,56 @@ ${domainHint}
   "verification_required": true
 }
 
-statutes와 precedents는 각각 2~4개 정도로 핵심적인 것만 제시하십시오.`;
+statutes와 precedents는 각각 2~4개 정도로 핵심적인 것만 제시하십시오.
 
-  const response = await fetch("https://api.anthropic.com/v1/messages", {
+검토할 사례:
+${caseText}`;
+
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${GEMINI_MODEL}:generateContent`;
+
+  const response = await fetch(url, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "x-goog-api-key": GEMINI_API_KEY
+    },
     body: JSON.stringify({
-      model: "claude-sonnet-4-6",
-      max_tokens: 1000,
-      system: systemPrompt,
-      messages: [
-        { role: "user", content: `다음 사례를 검토해 주십시오:\n\n${caseText}` }
+      contents: [
+        { role: "user", parts: [{ text: prompt }] }
       ],
       tools: [
-        { type: "web_search_20250305", name: "web_search" }
+        { google_search: {} }
       ]
     })
   });
 
   if (!response.ok) {
-    throw new Error(`API 요청 실패 (status ${response.status})`);
+    const errBody = await response.text().catch(() => "");
+    throw new Error(`API 요청 실패 (status ${response.status}) ${errBody.slice(0, 200)}`);
   }
 
   const data = await response.json();
 
-  const textBlocks = (data.content || [])
-    .filter(item => item.type === "text")
-    .map(item => item.text)
+  const candidate = data.candidates && data.candidates[0];
+  if (!candidate) {
+    throw new Error("응답이 비어 있습니다. 입력을 조금 더 구체적으로 작성해 다시 시도해 주세요.");
+  }
+
+  const textBlocks = (candidate.content && candidate.content.parts || [])
+    .map(p => p.text || "")
     .join("\n");
 
-  return parseJsonLoose(textBlocks);
+  const parsed = parseJsonLoose(textBlocks);
+
+  // Gemini grounding이 실제로 참고한 출처(있는 경우) 보강
+  const groundingChunks = candidate.groundingMetadata && candidate.groundingMetadata.groundingChunks;
+  if (Array.isArray(groundingChunks) && groundingChunks.length) {
+    parsed._groundingSources = groundingChunks
+      .map(c => c.web && { title: c.web.title, uri: c.web.uri })
+      .filter(Boolean);
+  }
+
+  return parsed;
 }
 
 function parseJsonLoose(text){
@@ -556,6 +589,7 @@ function renderResults(data){
       <div class="verification-note">
         <strong>검증 필요.</strong> 위 판례 정보는 AI 검색 결과를 기반으로 생성되었습니다. 실제 업무 활용 전 종합법률정보(glaw.scourt.go.kr) 또는 법원도서관을 통해 사건번호와 판시내용을 반드시 직접 확인하십시오.
       </div>
+      ${renderGroundingSources(data._groundingSources)}
     </div>`;
 
   resultsEl.innerHTML = html;
@@ -563,6 +597,17 @@ function renderResults(data){
 
 function emptyRow(msg){
   return `<div class="statute-item" style="color:#a8a399; font-size:13px;">${escapeHtml(msg)}</div>`;
+}
+
+function renderGroundingSources(sources){
+  if (!Array.isArray(sources) || sources.length === 0) return "";
+  return `
+    <div class="grounding-sources">
+      <div class="gs-label">검색 시 참고된 출처</div>
+      ${sources.map(s => `
+        <a class="gs-link" href="${escapeHtml(s.uri || '#')}" target="_blank" rel="noopener">${escapeHtml(s.title || s.uri || '출처')}</a>
+      `).join("")}
+    </div>`;
 }
 </script>
 
